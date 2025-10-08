@@ -1,81 +1,80 @@
 {
-	"name": "vscode-cucumber-js-runner",
-	"displayName": "Cucumber JS Test Runner",
-	"description": "Cucumber JS Test Runner for VS Code",
-	"version": "1.89.2",
-	"publisher": "nick-mandziak",
-	"icon": "images/icon.png",
-	"private": true,
-	"license": "MIT",
-	"engines": {
-		"vscode": "^1.89.0"
-	},
-	"categories": [
-		"Testing"
-	],
-	"keywords": [
-		"Cucumber",
-		"Gherkin"
-	],
-	"repository": {
-		"type": "git",
-		"url": "git://github.com/mandziak-nv/vscode-cucumber-js-runner.git"
-	},
-	"activationEvents": [
-		"workspaceContains:**/*.feature"
-	],
-	"main": "./out/extension.js",
-	"contributes": {
-		"configuration": {
-			"title": "Cucumber JS Test Runner",
-			"properties": {
-				"cucumber_runner.features": {
-					"markdownDescription": "The `cucumber_runner.features` setting defines where the extension should look for `.feature` files.\nDefault value:\n```json\n{\n  \"cucumber_runner.features\": [\n    \"features/**/*.feature\"\n  ]\n}\n```",
-					"type": "array",
-					"required": false,
-					"default": [
-						"features/**/*.feature"
-					]
-				},
-				"cucumber_runner.env_variables": {
-					"markdownDescription": "The `cucumber_runner.env_variables` setting defines environment variables that will be passed to the `cucumber-js` command.\nDefault value:\n```json\n{\n  \"cucumber_runner.env_variables\": {}\n}\n```",
-					"type": "object",
-					"required": false,
-					"default": {}
-				},
-				"cucumber_runner.cli_options": {
-					"markdownDescription": "The `cucumber_runner.cli_options` setting defines options that will be passed to the `cucumber-js` command.\nDefault value:\n```json\n{\n  \"cucumber_runner.cli_options\": []\n}\n```",
-					"type": "array",
-					"required": false,
-					"default": []
-				},
-				"cucumber_runner.cucumber_path": {
-					"markdownDescription": "",
-					"type": "string",
-					"required": false,
-					"default": "./node_modules/.bin/cucumber-js"
-				},
-				"cucumber_runner.debug_env_variables": {
-					"markdownDescription": "The `cucumber_runner.debug_env_variables` setting defines environment variables that will be passed to the `cucumber-js` command when debugging.\nSample:\n```json\n{\n  \"cucumber_runner.debug_env_variables\": {\n    \"PWDEBUG\": \"1\"\n  }\n}\n```\nDefault value:\n```json\n{\n  \"cucumber_runner.debug_env_variables\": {}\n}\n```",
-					"type": "object",
-					"required": false,
-					"default": {
-					}
-				}
-			}
-		}
-	},
-	"scripts": {
-		"build": "vsce package",
-		"publish": "vsce publish",
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./"
-	},
-	"devDependencies": {
-		"@types/node": "^20.14.8",
-		"@types/vscode": "^1.89.0",
-		"@vscode/vsce": "^2.29.0",
-		"typescript": "^5.5.2"
-	}
+  "name": "vscode-cucumber-js-runner",
+  "displayName": "Cucumber JS Test Runner",
+  "description": "Cucumber JS Test Runner for VS Code",
+  "version": "1.89.2",
+  "publisher": "nick-mandziak",
+  "icon": "images/icon.png",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "categories": [
+    "Testing"
+  ],
+  "keywords": [
+    "Cucumber",
+    "Gherkin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mandziak-nv/vscode-cucumber-js-runner.git"
+  },
+  "activationEvents": [
+    "workspaceContains:**/*.feature"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Cucumber JS Test Runner",
+      "properties": {
+        "cucumber_runner.features": {
+          "markdownDescription": "The `cucumber_runner.features` setting defines where the extension should look for `.feature` files.\nDefault value:\n```json\n{\n  \"cucumber_runner.features\": [\n    \"features/**/*.feature\"\n  ]\n}\n```",
+          "type": "array",
+          "required": false,
+          "default": [
+            "features/**/*.feature"
+          ]
+        },
+        "cucumber_runner.env_variables": {
+          "markdownDescription": "The `cucumber_runner.env_variables` setting defines environment variables that will be passed to the `cucumber-js` command.\nDefault value:\n```json\n{\n  \"cucumber_runner.env_variables\": {}\n}\n```",
+          "type": "object",
+          "required": false,
+          "default": {}
+        },
+        "cucumber_runner.cli_options": {
+          "markdownDescription": "The `cucumber_runner.cli_options` setting defines options that will be passed to the `cucumber-js` command.\nDefault value:\n```json\n{\n  \"cucumber_runner.cli_options\": []\n}\n```",
+          "type": "array",
+          "required": false,
+          "default": []
+        },
+        "cucumber_runner.cucumber_path": {
+          "markdownDescription": "",
+          "type": "string",
+          "required": false,
+          "default": "./node_modules/.bin/cucumber-js"
+        },
+        "cucumber_runner.debug_env_variables": {
+          "markdownDescription": "The `cucumber_runner.debug_env_variables` setting defines environment variables that will be passed to the `cucumber-js` command when debugging.\nDefault value:\n```json\n{\n  \"cucumber_runner.debug_env_variables\": {}\n}\n```",
+          "type": "object",
+          "required": false,
+          "default": {}
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "vsce package",
+    "publish": "vsce publish",
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.8",
+    "@types/vscode": "^1.89.0",
+    "@vscode/vsce": "^2.29.0",
+    "typescript": "^5.5.2"
+  }
 }
