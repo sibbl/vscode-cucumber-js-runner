@@ -90,11 +90,22 @@ export default class TestFile {
                     const lineData = rawHeaders.split("|").map((header) => header.trim());
                     if (!exampleHeaders) {
                         exampleHeaders = lineData;
-                    } else {
-                        let exampleScenarioName = lastScenarioName!;
+                    } else if (lastScenarioName) {
+                        let exampleScenarioName = lastScenarioName;
+
+                        const unreplacedPlaceholders: string[] = [];
                         exampleHeaders.forEach((header, index) => {
-                            exampleScenarioName = exampleScenarioName?.replace(`<${header}>`, lineData[index]);
+                            const placeholder = `<${header}>`;
+                            if (exampleScenarioName?.includes(placeholder)) {
+                                exampleScenarioName = exampleScenarioName.replace(placeholder, lineData[index]);
+                            } else {
+                                unreplacedPlaceholders.push(`${header}: ${lineData[index]}`);
+                            }
                         });
+
+                        if (unreplacedPlaceholders.length > 0) {
+                            exampleScenarioName += ` (${unreplacedPlaceholders.join(", ")})`;
+                        }
 
                         const name = exampleScenarioName;
                         const range = new vscode.Range(new vscode.Position(lineNo, 0), new vscode.Position(lineNo, line.length));
