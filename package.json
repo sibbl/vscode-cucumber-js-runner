@@ -2,13 +2,13 @@
 	"name": "vscode-cucumber-js-runner",
 	"displayName": "Cucumber JS Test Runner",
 	"description": "Cucumber JS Test Runner for VS Code",
-	"version": "1.89.3",
-	"publisher": "nick-mandziak",
+	"version": "1.90.0",
+	"publisher": "sibbl",
 	"icon": "images/icon.png",
 	"private": true,
 	"license": "MIT",
 	"engines": {
-		"vscode": "^1.89.0"
+		"vscode": "^1.105.0"
 	},
 	"categories": [
 		"Testing"
@@ -19,7 +19,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git://github.com/mandziak-nv/vscode-cucumber-js-runner.git"
+		"url": "git://github.com/sibbl/vscode-cucumber-js-runner.git"
 	},
 	"activationEvents": [
 		"workspaceContains:**/*.feature"
@@ -78,9 +78,9 @@
 		"watch": "tsc -watch -p ./"
 	},
 	"devDependencies": {
-		"@types/node": "^20.14.8",
-		"@types/vscode": "^1.89.0",
-		"@vscode/vsce": "^2.29.0",
-		"typescript": "^5.5.2"
+		"@types/node": "^24.9.1",
+		"@types/vscode": "^1.105.0",
+		"@vscode/vsce": "^3.6.2",
+		"typescript": "^5.9.3"
 	}
 }

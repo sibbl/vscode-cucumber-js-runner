@@ -2,6 +2,13 @@
 
 This extension adds support for Cucumber JS tests running using VS Code testing tools.
 
+> [!NOTE]
+> This repository is a fork of the excellent [vscode-cucumber-js-runner](https://github.com/mandziak-nv/vscode-cucumber-js-runner) extension by [@mandziak-nv](https://github.com/mandziak-nv) with the following additions:
+>
+> - Added support for `Examples:` tables in Scenario Outlines when displaying test names in the testing panel.
+> - Support for defining specific environment variables when debugging tests.
+> - Support for defining the working directory for the `cucumber-js` command.
+
 ## Tests
 
 It looks for tests in `.feature` files:
