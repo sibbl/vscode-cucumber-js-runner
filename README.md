@@ -59,7 +59,6 @@ Example:
 }
 ```
 
-
 The `cucumber_runner.cli_options` setting defines options that will be passed to the `cucumber-js` command.
 
 Example:
@@ -82,5 +81,15 @@ Example:
 ```json
 {
   "cucumber_runner.cucumber_path": "./node_modules/.bin/cucumber-js"
+}
+```
+
+The `cucumber_runner.cwd` setting defines the working directory for the `cucumber-js` command.
+
+Example:
+
+```json
+{
+  "cucumber_runner.cwd": "${workspaceFolder}/tests"
 }
 ```
