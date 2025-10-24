@@ -2,7 +2,7 @@
   "name": "vscode-cucumber-js-runner-v2",
   "displayName": "Cucumber JS Test Runner v2",
   "description": "Cucumber JS Test Runner for VS Code - fork of the original with improvements and bug fixes",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "sibbl",
   "icon": "images/icon.png",
   "private": true,
@@ -27,7 +27,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Cucumber JS Test Runner",
+      "title": "Cucumber JS Test Runner v2",
       "properties": {
         "cucumber_runner.features": {
           "markdownDescription": "The `cucumber_runner.features` setting defines where the extension should look for `.feature` files.\nDefault value:\n```json\n{\n  \"cucumber_runner.features\": [\n    \"features/**/*.feature\"\n  ]\n}\n```",

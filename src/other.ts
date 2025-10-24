@@ -7,11 +7,7 @@ import TestSuite from './testTree/TestSuite';
 export const testItemDataMap = new WeakMap<vscode.TestItem, TestFile | TestSuite | TestCase>();
 
 export function getWorkspaceTestPatterns(): vscode.RelativePattern[] {
-    if (!vscode.workspace.workspaceFolders) {
-        return [];
-    }
-    const cwd = vscode.workspace.workspaceFolders[0];
-    const { featurePaths } = getExtensionConfiguration();
+    const { featurePaths, cwd } = getExtensionConfiguration();
     return featurePaths.map(pattern => (new vscode.RelativePattern(cwd, pattern)));
 }
 
