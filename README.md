@@ -100,3 +100,77 @@ Example:
   "cucumber_runner.cwd": "${workspaceFolder}/tests"
 }
 ```
+
+### Node debugger
+
+Debug Tests pauses Node before Cucumber starts and attaches VS Code before
+continuing, so breakpoints in early support code can be hit. The default inspector
+uses an available loopback port. Existing `NODE_OPTIONS` (for example, TypeScript
+loaders) are preserved. To select a port:
+
+```json
+{
+  "cucumber_runner.debug_env_variables": {
+    "NODE_OPTIONS": "--inspect-brk=9230"
+  }
+}
+```
+
+An existing `--inspect` option is upgraded to `--inspect-brk` during debugging.
+Attachment uses the address and port reported by Node, including port `0`.
+Debug runs execute serially (`--parallel 0`) so the selected process owns the
+breakpoints. Normal runs retain the configured parallelism. Cancelling a test or
+stopping its debugger terminates that run and removes its temporary files.
+
+### Debug timeout
+
+`cucumber_runner.debug_timeout` changes the default step/hook timeout for debug
+runs only. Set it to a positive integer in milliseconds, `-1` to disable the
+default timeout, or `null` (the default) to leave project settings unchanged.
+Explicit timeouts on individual steps/hooks still apply. A later call to
+`setDefaultTimeout()` in imported support code can also override this value.
+
+When using this setting, **configure support-code paths explicitly** in your
+Cucumber configuration or `cucumber_runner.cli_options`. The temporary timeout
+helper uses Cucumber's `--require`, which replaces automatic support-code
+discovery when no explicit paths were provided. For a CommonJS project:
+
+```json
+{
+  "cucumber_runner.debug_timeout": -1,
+  "cucumber_runner.cli_options": ["--require", "features/**/*.js"]
+}
+```
+
+For an ESM project, use the appropriate `--import` paths instead. Keep existing
+TypeScript loaders and support paths. The helper resolves the Cucumber package
+from the configured CLI, including hoisted installations. It changes no project
+files and is removed when its process exits. Disabling the default timeout does
+not disable browser or assertion-library timeouts; use Cancel to end a stuck run.
+
+## Development checks
+
+```sh
+npm ci
+npm test
+```
+
+The tests cover output chunk boundaries and duration units, scenario states,
+example-row identities, debugger attachment failures and cancellation, and
+per-process timeout cleanup. To run the real CLI smoke tests against a separately
+installed Cucumber version:
+
+```sh
+CUCUMBER_PACKAGE=/absolute/path/to/node_modules/@cucumber/cucumber \
+  node --test test/cucumber.integration.cjs
+```
+
+CLI smoke tests passed with Cucumber 7.3.2, 10.9.0, and 13.2.1 on Node 24.19.0.
+These results cover the fixtures above, not every project configuration or all
+versions between them.
+
+The automated checks do not replace an Extension Development Host check: verify
+an early JavaScript/TypeScript breakpoint, pause longer than five seconds with
+`debug_timeout: -1`, and check Cancel and Stop Debugging. Windows and Remote/WSL
+attachment also need manual validation before release. Compatibility claims
+should name the tested Cucumber and Node versions rather than all future releases.

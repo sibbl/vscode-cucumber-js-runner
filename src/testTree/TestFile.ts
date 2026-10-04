@@ -47,7 +47,7 @@ export default class TestFile {
             if (feature) {
                 const [, name] = feature;
                 const range = new vscode.Range(new vscode.Position(lineNo, 0), new vscode.Position(lineNo, line.length));
-                const testItem = controller.createTestItem(`${item.uri}/${name}`, name, item.uri);
+                const testItem = controller.createTestItem(`${item.uri}:${lineNo + 1}`, name, item.uri);
                 testItem.range = range;
                 testItemDataMap.set(testItem, new TestSuite());
                 featureTestItem = testItem;
@@ -60,14 +60,14 @@ export default class TestFile {
                 const [, name] = scenario;
                 const range = new vscode.Range(new vscode.Position(lineNo, 0), new vscode.Position(lineNo, line.length));
                 const isTestCaseOutline = /^\s*Scenario Outline:/.test(line);
-                const testItem = controller.createTestItem(`${item.uri}/${name}`, name, item.uri);
+                const testItem = controller.createTestItem(`${item.uri}:${lineNo + 1}`, name, item.uri);
                 testItem.range = range;
                 if (isTestCaseOutline) {
                     testItemDataMap.set(testItem, new TestSuite());
                 } else {
                     testItemDataMap.set(
                         testItem,
-                        new TestCase(name, isTestCaseOutline, testItem.range!.end)
+                        new TestCase(name, isTestCaseOutline, testItem.range!.end, item.uri!.fsPath, lineNo + 1)
                     );
                 }
                 featureTestItem?.children.add(testItem);
@@ -80,6 +80,7 @@ export default class TestFile {
             const examples = examplesRe.exec(line);
             if (examples) {
                 isExamplesLine = true;
+                exampleHeaders = undefined;
                 continue;
             }
 
@@ -109,7 +110,7 @@ export default class TestFile {
 
                         const name = exampleScenarioName;
                         const range = new vscode.Range(new vscode.Position(lineNo, 0), new vscode.Position(lineNo, line.length));
-                        const testItem = controller.createTestItem(`${item.uri}/${name}`, name, item.uri);
+                        const testItem = controller.createTestItem(`${item.uri}:${lineNo + 1}`, name, item.uri);
                         testItem.range = range;
                         testItemDataMap.set(testItem, new TestCase(name, false, scenarioTestItem!.range!.end, item.uri!.fsPath, lineNo + 1));
                         scenarioTestItem?.children.add(testItem);

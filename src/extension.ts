@@ -12,11 +12,11 @@ export async function activate(context: vscode.ExtensionContext) {
 	};
 
 	const runHandler = (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
-		startTestRun(testController, request, token, false);
+		return startTestRun(testController, request, token, false);
 	};
 
 	const debugHandler = (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
-		startTestRun(testController, request, token, true);
+		return startTestRun(testController, request, token, true);
 	};
 
 	testController.createRunProfile('Run Tests', vscode.TestRunProfileKind.Run, runHandler, true, undefined, false);

@@ -68,13 +68,17 @@
           "default": {}
         },
         "cucumber_runner.debug_timeout": {
-          "markdownDescription": "The `cucumber_runner.debug_timeout` setting defines the step timeout in milliseconds applied via `setDefaultTimeout()` only during debug runs. Set to `-1` to disable the timeout entirely. When unset (null), the cucumber default is used.\nExample:\n```json\n{\n  \"cucumber_runner.debug_timeout\": -1\n}\n```",
+          "markdownDescription": "Default step/hook timeout in milliseconds for debug runs only. Use a positive integer, -1 to disable the default timeout, or null to leave project settings unchanged. Explicit step/hook timeouts still apply. See README for support-code configuration.",
           "type": [
-            "number",
+            "integer",
             "null"
           ],
           "required": false,
-          "default": null
+          "default": null,
+          "minimum": -1,
+          "not": {
+            "const": 0
+          }
         }
       }
     }
@@ -84,7 +88,8 @@
     "publish": "vsce publish",
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test test/*.test.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
