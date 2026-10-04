@@ -1,124 +1,175 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { getExtensionConfiguration } from '../configuration/getExtensionConfiguration';
 import TestCase from '../testTree/TestCase';
+import { CucumberOutput } from './parseResults';
+import { inspectorEndpoint, prepareDebugOptions } from './debugOptions';
+import { createDebugTimeout } from './debugTimeout';
+import { scenarioTarget } from './scenarioTarget';
 
 export class CucumberRunner {
-    private static cucumberProcess: ChildProcessWithoutNullStreams | undefined;
-    private static debugTimeoutFile: string | undefined;
+    private static activeRun: { owner: vscode.TestRun; stop: (signal?: NodeJS.Signals | number) => boolean } | undefined;
 
-    public static runTest(testRun: vscode.TestRun, testCase: TestCase, debug?: boolean): Promise<string[]> {
+    public static async runTest(testRun: vscode.TestRun, testCase: TestCase, debug = false): Promise<CucumberOutput> {
         this.killCucumberProcess();
-
-        const cucumberOutput: string[] = [];
-        this.cucumberProcess = this.spawnCucumberProcess(testRun, testCase, debug);
-
+        const { featurePaths, env, cliOptions, cucumberPath, cwd, debugEnv, debugTimeout } = getExtensionConfiguration();
+        let timeoutFile: ReturnType<typeof createDebugTimeout> | undefined;
+        const output: CucumberOutput = { stdout: [], stderr: [], exitCode: null };
+        const processEnv = { ...process.env, ...env, ...(debug ? debugEnv : {}) };
+        const args: string[] = [];
         if (debug) {
-            const { debugEnv } = getExtensionConfiguration();
-            const port = this.extractDebugPort(debugEnv);
-            // --inspect-brk pauses immediately — attach after brief delay for port to open
-            setTimeout(() => {
-                vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], {
-                    type: 'node',
-                    request: 'attach',
-                    name: 'Attach to Cucumber',
-                    port,
-                    skipFiles: ['<node_internals>/**', '**/node_modules/**'],
-                    sourceMaps: true,
-                }).then(undefined, (err: unknown) => {
-                    this.log(testRun, `Warning: could not attach debugger: ${err}\r\n`);
-                });
-            }, 500);
+            const options = prepareDebugOptions(processEnv.NODE_OPTIONS);
+            processEnv.NODE_OPTIONS = options.nodeOptions;
+            args.push(...options.nodeArguments);
+        }
+        args.push(cucumberPath);
+        if (testCase.featureFilePath && testCase.exampleLineNumber !== undefined) {
+            args.push(scenarioTarget(cwd, testCase.featureFilePath, testCase.exampleLineNumber));
+        } else {
+            const name = testCase.name.replace(/([.+*?^$()[\]{}|\\])/g, '\\$1').replace(/<[^>]*>/g, '.*');
+            args.push(...featurePaths, '--name', `^${name}$`);
+        }
+        args.push(...cliOptions);
+        // One debugger owns one Cucumber process. Worker processes would inherit
+        // user inspector flags and run support code outside this debug session.
+        if (debug) { args.push('--parallel', '0'); }
+        let child: ChildProcessWithoutNullStreams;
+        try {
+            if (debug && debugTimeout !== null) {
+                timeoutFile = createDebugTimeout(cwd, cucumberPath, debugTimeout);
+                args.push('--require', timeoutFile.file);
+            }
+            this.log(testRun, `Executing command: node ${args.map(arg => JSON.stringify(arg)).join(' ')}\n\n`);
+            child = spawn('node', args, { cwd, env: processEnv });
+        } catch (error) {
+            timeoutFile?.dispose();
+            return { ...output, error: `Could not start Cucumber: ${String(error)}` };
         }
 
-        return new Promise((resolve) => {
-            this.cucumberProcess!.stdout.on('data', (chunk: any) => {
-                this.log(testRun, chunk);
-                cucumberOutput.push(chunk.toString());
-            });
-
-            this.cucumberProcess!.stderr.on('data', (chunk: any) => {
-                this.log(testRun, chunk);
-            });
-
-            this.cucumberProcess!.on('close', () => {
-                if (this.debugTimeoutFile) {
-                    try { fs.unlinkSync(this.debugTimeoutFile); } catch {}
-                    this.debugTimeoutFile = undefined;
+        return new Promise(resolve => {
+            let closed = false;
+            let stopping = false;
+            let attaching = false;
+            let attachPending = false;
+            let exiting = false;
+            let session: vscode.DebugSession | undefined;
+            let attachTimer: ReturnType<typeof setTimeout> | undefined;
+            let killTimer: ReturnType<typeof setTimeout> | undefined;
+            let startListener: vscode.Disposable | undefined;
+            let terminateListener: vscode.Disposable | undefined;
+            const runId = randomUUID();
+            const stopSession = (target: vscode.DebugSession) => {
+                void Promise.resolve(vscode.debug.stopDebugging(target)).catch(error => {
+                    this.log(testRun, `Could not stop Cucumber debugger: ${String(error)}\n`);
+                });
+            };
+            const stop = (signal?: NodeJS.Signals | number): boolean => {
+                if (closed || stopping) { return true; }
+                stopping = true;
+                clearTimeout(attachTimer);
+                if (session) { stopSession(session); }
+                const killed = child.kill(signal);
+                // Cancellation must also work while the process is paused or
+                // user code has installed a SIGTERM handler.
+                killTimer = setTimeout(() => { if (!closed) { child.kill('SIGKILL'); } }, 2000);
+                killTimer.unref();
+                return killed;
+            };
+            const activeRun = { owner: testRun, stop };
+            this.activeRun = activeRun;
+            const finish = () => {
+                if (closed) { return; }
+                closed = true;
+                clearTimeout(attachTimer);
+                clearTimeout(killTimer);
+                if (session) { stopSession(session); }
+                terminateListener?.dispose();
+                // An attachment already in flight may still create a session.
+                // Keep its listener until startDebugging settles, and stop only it.
+                if (!attachPending) { startListener?.dispose(); }
+                try { timeoutFile?.dispose(); } catch (error) {
+                    this.log(testRun, `Could not remove debug timeout file: ${String(error)}\n`);
                 }
-                resolve(cucumberOutput);
+                if (this.activeRun === activeRun) { this.activeRun = undefined; }
+                resolve(output);
+            };
+            const attachFailed = (error: unknown) => {
+                if (closed || stopping) { return; }
+                output.error = `Could not attach Cucumber debugger: ${String(error)}`;
+                this.log(testRun, `${output.error}\n`);
+                stop();
+            };
+            if (debug) {
+                startListener = vscode.debug.onDidStartDebugSession(candidate => {
+                    if (candidate.configuration.cucumberRunId !== runId) { return; }
+                    session = candidate;
+                    if (closed || stopping) { stopSession(candidate); }
+                });
+                terminateListener = vscode.debug.onDidTerminateDebugSession(candidate => {
+                    if (candidate.configuration.cucumberRunId === runId && !closed && !exiting) { stop(); }
+                });
+                attachTimer = setTimeout(() => attachFailed('Inspector startup/attachment timed out after 10 seconds'), 10000);
+            }
+            child.stdout.setEncoding('utf8');
+            child.stderr.setEncoding('utf8');
+            child.stdout.on('data', (chunk: string) => {
+                this.log(testRun, chunk);
+                output.stdout.push(chunk);
+            });
+            child.stderr.on('data', (chunk: string) => {
+                this.log(testRun, chunk);
+                output.stderr.push(chunk);
+                if (!debug || closed || stopping) { return; }
+                const stderr = output.stderr.join('');
+                // Node waits for the inspector client to disconnect before exit.
+                if (/^Waiting for the debugger to disconnect\.\.\./m.test(stderr) && session) {
+                    exiting = true;
+                    stopSession(session);
+                }
+                if (attaching) { return; }
+                const endpoint = inspectorEndpoint(stderr);
+                if (!endpoint) { return; }
+                attaching = true;
+                attachPending = true;
+                void (async () => {
+                    try {
+                        const attached = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], {
+                            type: 'node', request: 'attach', name: 'Attach to Cucumber',
+                            ...endpoint, continueOnAttach: true,
+                            skipFiles: ['<node_internals>/**', '**/node_modules/**'],
+                            sourceMaps: true, cucumberRunId: runId,
+                        });
+                        if (!attached) { attachFailed('VS Code declined to start the debug session'); }
+                        else { clearTimeout(attachTimer); }
+                    } catch (error) { attachFailed(error); }
+                    finally {
+                        attachPending = false;
+                        if (closed) { startListener?.dispose(); }
+                        if ((closed || stopping) && session) { stopSession(session); }
+                    }
+                })();
+            });
+            child.on('error', error => {
+                output.error = `Could not run Cucumber: ${error.message}`;
+                finish();
+            });
+            child.on('close', (code, signal) => {
+                output.exitCode = code;
+                output.signal = signal;
+                finish();
             });
         });
     }
 
-    private static extractDebugPort(debugEnv: {[key: string]: string}): number {
-        const nodeOptions = Object.values(debugEnv).find(v => v.includes('--inspect')) ?? '';
-        const match = nodeOptions.match(/--inspect(?:-brk)?(?:=[^:]*:)?(\d+)/);
-        return match?.[1] ? parseInt(match[1], 10) : 9229;
-    }
-
-    private static spawnCucumberProcess(testRun: vscode.TestRun, testCase: TestCase, debug?: boolean): ChildProcessWithoutNullStreams {
-        const { featurePaths, env, cliOptions, cucumberPath, cwd, debugEnv, debugTimeout } = getExtensionConfiguration();
-
-        let nodeArguments: string[];
-        let logSuffix: string;
-
-        if (testCase.featureFilePath && testCase.exampleLineNumber !== undefined) {
-            // Use file:line targeting for Scenario Outline examples — more reliable than --name with appended params
-            const fileTarget = `${testCase.featureFilePath}:${testCase.exampleLineNumber}`;
-            nodeArguments = [cucumberPath, fileTarget, ...cliOptions];
-            logSuffix = [cucumberPath, `"${fileTarget}"`, ...cliOptions].join(' ');
-        } else {
-            // Use --name regex for regular scenarios
-            let scenarioNameRegexed = `^${testCase.name.replace(/([.+*?^$()[\]{}|\\])/g, '\\$1')}$`;
-            scenarioNameRegexed = scenarioNameRegexed.replace(/<[^>]*>/g, ".*");
-            nodeArguments = [cucumberPath, ...featurePaths, '--name', scenarioNameRegexed, ...cliOptions];
-            logSuffix = [cucumberPath, ...featurePaths, '--name', `"${scenarioNameRegexed}"`, ...cliOptions].join(' ');
-        }
-
-        if (debug && debugTimeout !== null) {
-            const cucumberPkg = path.join(cwd, 'node_modules', '@cucumber', 'cucumber');
-            this.debugTimeoutFile = path.join(os.tmpdir(), `cucumber-debug-timeout-${Date.now()}.cjs`);
-            fs.writeFileSync(
-                this.debugTimeoutFile,
-                `const { setDefaultTimeout } = require(${JSON.stringify(cucumberPkg)});\nsetDefaultTimeout(${debugTimeout});\n`
-            );
-            nodeArguments.push('--require', this.debugTimeoutFile);
-        }
-
-        const debugEnvMergedForLog = debug ? {NODE_OPTIONS: '--inspect=9229', ...debugEnv} : {};
-        this.log(testRun,
-            'Executing command: '
-            + (Object.keys(debugEnvMergedForLog).length ? `${Object.keys(debugEnvMergedForLog).map(vr => vr + '=......').join(' ')} ` : '')
-            + (Object.keys(env).length ? `${Object.keys(env).map(vr => vr + '=......').join(' ')} ` : '')
-            + 'node '
-            + logSuffix
-            + '\n\n'
-        );
-
-        return spawn(
-            'node', nodeArguments,
-            {
-                cwd: cwd,
-                env: {
-                    ...process.env, ...env,
-                    ...debugEnvMergedForLog,
-                },
-            }
-        );
-    }
-
-    public static killCucumberProcess(signal?: NodeJS.Signals | number): boolean {
-        if (this.cucumberProcess && !this.cucumberProcess.killed) {
-            return this.cucumberProcess.kill(signal);
+    public static killCucumberProcess(signal?: NodeJS.Signals | number, owner?: vscode.TestRun): boolean {
+        if (this.activeRun && (!owner || this.activeRun.owner === owner)) {
+            return this.activeRun.stop(signal);
         }
         return true;
     }
 
-    public static log(testRun: vscode.TestRun, message: any): void {
-        testRun.appendOutput(message.toString().replaceAll('\n', '\r\n'));
+    public static log(testRun: vscode.TestRun, message: string): void {
+        testRun.appendOutput(message.replace(/\r?\n/g, '\r\n'));
     }
 }
